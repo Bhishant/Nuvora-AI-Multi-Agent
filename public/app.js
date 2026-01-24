@@ -1,5 +1,6 @@
 class NuVoraClient {
     constructor() {
+        // Use relative paths for Vercel
         this.baseURL = window.location.origin;
         this.currentSession = null;
         this.sessions = [];
