@@ -5,20 +5,21 @@ const Orchestrator = require('./orchestrator');
 const { checkAPIStatus } = require('./llmAdapter');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3333;
 
-// Configure CORS for Vercel
+// Enable CORS
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'DELETE', 'PUT'],
+    allowedHeaders: ['Content-Type']
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
 
-// Serve static files from public directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files only in non-Vercel environment
+if (!process.env.VERCEL) {
+    app.use(express.static('public'));
+}
 
 const orchestrator = new Orchestrator();
 
@@ -33,15 +34,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        timestamp: new Date(),
-        service: 'NuVora AI',
-        environment: process.env.NODE_ENV || 'development'
-    });
-});
+// ==================== API ENDPOINTS ====================
 
 // API Debug Info
 app.get('/api/debug', (req, res) => {
@@ -51,7 +44,8 @@ app.get('/api/debug', (req, res) => {
     res.json({
         status: 'Server is running',
         timestamp: new Date(),
-        port: PORT,
+        port: port,
+        environment: process.env.VERCEL ? 'Vercel' : 'Local',
         sessions: sessions.length,
         activeSession: sessions.find(s => s.active)?.name || 'None',
         agents: ['planner', 'researcher', 'writer'],
@@ -67,6 +61,16 @@ app.get('/api/debug', (req, res) => {
             'GET  /api/export/pdf/:taskId',
             'GET  /api/health'
         ]
+    });
+});
+
+// Test endpoint
+app.get('/api/test', (req, res) => {
+    res.json({
+        success: true,
+        message: 'API is working correctly!',
+        timestamp: new Date(),
+        environment: process.env.VERCEL ? 'Vercel Production' : 'Local Development'
     });
 });
 
@@ -90,7 +94,15 @@ app.get('/api/sessions', (req, res) => {
 app.post('/api/sessions', (req, res) => {
     try {
         const { name } = req.body;
-        const sessionId = orchestrator.createSession(name || 'New Session');
+        
+        if (!name || name.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'Session name is required'
+            });
+        }
+        
+        const sessionId = orchestrator.createSession(name.trim());
         
         res.json({
             success: true,
@@ -181,7 +193,7 @@ app.post('/api/task', async (req, res) => {
         
         const { task, taskType, sessionId } = req.body;
         
-        if (!task) {
+        if (!task || task.trim() === '') {
             return res.status(400).json({ 
                 success: false,
                 error: 'Task description is required' 
@@ -189,7 +201,7 @@ app.post('/api/task', async (req, res) => {
         }
 
         console.log(`🚀 Processing: "${task}" (Type: ${taskType || 'auto'})`);
-        const result = await orchestrator.executeTask(task, taskType, sessionId);
+        const result = await orchestrator.executeTask(task.trim(), taskType, sessionId);
         
         console.log(`✅ Task completed: ${result.formatted?.length || 0} chars`);
         
@@ -205,7 +217,7 @@ app.post('/api/task', async (req, res) => {
         console.error('❌ API Error:', error);
         res.status(500).json({
             success: false,
-            error: error.message,
+            error: error.message || 'Internal server error',
             timestamp: new Date()
         });
     }
@@ -308,7 +320,6 @@ app.get('/api/export/session/:id', (req, res) => {
     }
 });
 
-// PDF Export Endpoint
 app.get('/api/export/pdf/:taskId', async (req, res) => {
     try {
         const { taskId } = req.params;
@@ -411,9 +422,49 @@ app.get('/api/export/pdf/:taskId', async (req, res) => {
     }
 });
 
-// Serve frontend for all other routes
+// Health check
+app.get('/api/health', (req, res) => {
+    const apiStatus = checkAPIStatus();
+    res.json({ 
+        status: 'OK',
+        timestamp: new Date(),
+        sessions: orchestrator.getSessions().length,
+        groq: {
+            status: apiStatus.apiKey === 'Set' ? 'Connected' : 'Not Connected',
+            model: apiStatus.model
+        }
+    });
+});
+
+// ==================== FRONTEND ROUTING ====================
+
+// Serve index.html for all non-API routes
 app.get('*', (req, res) => {
+    // Don't handle API routes here
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({
+            success: false,
+            error: 'API endpoint not found',
+            path: req.path
+        });
+    }
+    
+    // In Vercel, serve from public directory
+    if (process.env.VERCEL) {
+        return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+    
+    // Local development
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'API endpoint not found',
+        path: req.originalUrl
+    });
 });
 
 // Error handling middleware
@@ -426,15 +477,23 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server or export for Vercel
-if (require.main === module) {
-    // Local development
-    app.listen(PORT, () => {
-        console.log(`\n🚀 NuVora AI Multi-Agent Server`);
-        console.log(`📍 Running on port ${PORT}`);
-        console.log(`📊 Dashboard: http://localhost:${PORT}`);
-    });
-} else {
-    // Export for Vercel
+// ==================== START SERVER ====================
+
+// Check if running in Vercel
+if (process.env.VERCEL) {
+    // Export for Vercel serverless function
     module.exports = app;
+} else {
+    // Local development
+    app.listen(port, () => {
+        console.log(`\n🚀 NuVora AI Multi-Agent Server`);
+        console.log(`📍 Running on port ${port}`);
+        console.log(`📊 Dashboard: http://localhost:${port}`);
+        console.log(`📁 Session Management Enabled`);
+        console.log(`🤖 PDF Export Ready`);
+        console.log(`\n📋 Available endpoints:`);
+        console.log(`   http://localhost:${port}/api/debug`);
+        console.log(`   http://localhost:${port}/api/health`);
+        console.log(`   http://localhost:${port}/api/test`);
+    });
 }
