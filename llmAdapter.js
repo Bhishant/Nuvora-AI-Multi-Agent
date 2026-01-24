@@ -1,43 +1,6 @@
 const Groq = require("groq-sdk");
-const fs = require('fs');
-const path = require('path');
 
-// Load environment variables from root directory
-const loadEnv = () => {
-    try {
-        const envPath = path.join(process.cwd(), '.env');
-        
-        if (fs.existsSync(envPath)) {
-            console.log(`📁 Loading .env from: ${envPath}`);
-            const envContent = fs.readFileSync(envPath, 'utf8');
-            
-            envContent.split('\n').forEach(line => {
-                const trimmedLine = line.trim();
-                if (trimmedLine && !trimmedLine.startsWith('#')) {
-                    const [key, ...valueParts] = trimmedLine.split('=');
-                    const value = valueParts.join('=').trim();
-                    if (key && value) {
-                        process.env[key.trim()] = value.replace(/['"]/g, '');
-                    }
-                }
-            });
-            
-            console.log('✅ Environment variables loaded from .env');
-            return true;
-        } else {
-            console.log('❌ .env file NOT found at:', envPath);
-            console.log('   Current directory:', process.cwd());
-            return false;
-        }
-    } catch (error) {
-        console.log('⚠️  Error loading .env:', error.message);
-        return false;
-    }
-};
-
-// Load environment variables
-const envLoaded = loadEnv();
-
+// Load environment variables for Vercel
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
@@ -55,9 +18,6 @@ if (GROQ_API_KEY && !GROQ_API_KEY.includes('your-') && !GROQ_API_KEY.includes('e
         groqClient = new Groq({ apiKey: GROQ_API_KEY });
         console.log('✅ Groq client initialized');
         isClientValid = true;
-        
-        // Quick connection test
-        testConnection();
     } catch (error) {
         console.log('❌ Failed to initialize Groq:', error.message);
     }
@@ -65,9 +25,8 @@ if (GROQ_API_KEY && !GROQ_API_KEY.includes('your-') && !GROQ_API_KEY.includes('e
     console.log('\n⚠️  WARNING: No valid Groq API key found!');
     console.log('\n   To fix this:');
     console.log('   1. Get a FREE API key from: https://console.groq.com');
-    console.log('   2. Create/update .env file in same folder as server.js');
-    console.log('   3. Add: GROQ_API_KEY=your_actual_key_here');
-    console.log('   4. Restart the server');
+    console.log('   2. Add GROQ_API_KEY environment variable in Vercel');
+    console.log('   3. Add GROQ_MODEL environment variable in Vercel');
 }
 
 async function testConnection() {
@@ -112,21 +71,19 @@ The Groq AI service is not properly configured.
 2. Sign up (free, no credit card required)
 3. Copy your API key
 
-### Step 2: Create/Update .env file
-Create a file named **.env** in the same folder as **server.js** with:
+### Step 2: Configure Environment Variables in Vercel
+1. Go to your Vercel project dashboard
+2. Navigate to Settings > Environment Variables
+3. Add these variables:
+   - GROQ_API_KEY: your_actual_key_here
+   - GROQ_MODEL: llama-3.1-8b-instant
 
-\`\`\`
-GROQ_API_KEY=your_actual_key_here
-GROQ_MODEL=llama-3.1-8b-instant
-PORT=3333
-\`\`\`
-
-### Step 3: Restart
-Stop and restart your server after updating the .env file.
+### Step 3: Redeploy
+Redeploy your application after adding environment variables.
 
 ---
 
-**Need help?** Check the server console for more details.`;
+**Need help?** Check the server logs for more details.`;
 
         return errorMsg;
     }
@@ -139,7 +96,7 @@ Stop and restart your server after updating the .env file.
             messages: [{ role: 'user', content: prompt }],
             model: GROQ_MODEL,
             temperature: 0.3,
-            max_tokens: 4000,  // Increased for longer responses
+            max_tokens: 4000,
             top_p: 0.9
         });
         
@@ -165,7 +122,7 @@ Stop and restart your server after updating the .env file.
             solution = 'Wait a few minutes and try again';
         } else if (error.message.includes('model')) {
             errorType = 'Invalid Model';
-            solution = `Change GROQ_MODEL in .env to one of: llama-3.1-8b-instant, llama-3.1-70b-versatile, mixtral-8x7b-32768`;
+            solution = `Change GROQ_MODEL to one of: llama-3.1-8b-instant, llama-3.1-70b-versatile, mixtral-8x7b-32768`;
         }
         
         return `# 🚨 API Error
@@ -190,7 +147,7 @@ function checkAPIStatus() {
         apiKey: GROQ_API_KEY ? 'Set' : 'Not set',
         client: isClientValid ? 'Ready' : 'Not ready',
         model: GROQ_MODEL,
-        envLoaded: envLoaded
+        environment: process.env.NODE_ENV || 'unknown'
     };
 }
 
