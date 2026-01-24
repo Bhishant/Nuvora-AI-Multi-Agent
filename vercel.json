@@ -5,7 +5,7 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["**"]
+        "includeFiles": ["**/*.js", "**/*.json", "**/*.env", "knowledge-base.js", "planner.js", "researcher.js", "writer.js", "llmAdapter.js", "orchestrator.js", "task-classifier.js"]
       }
     },
     {
@@ -20,11 +20,10 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/public/index.html"
+      "dest": "/public/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
     }
   ],
   "env": {
