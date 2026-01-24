@@ -5,16 +5,20 @@ const Orchestrator = require('./orchestrator');
 const { checkAPIStatus } = require('./llmAdapter');
 
 const app = express();
-const port = process.env.PORT || 3333;
+const PORT = process.env.PORT || 3000;
 
+// Configure CORS for Vercel
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST', 'DELETE', 'PUT'],
-    allowedHeaders: ['Content-Type']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
-app.use(express.static('public'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 const orchestrator = new Orchestrator();
 
@@ -29,6 +33,16 @@ app.use((req, res, next) => {
     next();
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date(),
+        service: 'NuVora AI',
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
 // API Debug Info
 app.get('/api/debug', (req, res) => {
     const apiStatus = checkAPIStatus();
@@ -37,7 +51,7 @@ app.get('/api/debug', (req, res) => {
     res.json({
         status: 'Server is running',
         timestamp: new Date(),
-        port: port,
+        port: PORT,
         sessions: sessions.length,
         activeSession: sessions.find(s => s.active)?.name || 'None',
         agents: ['planner', 'researcher', 'writer'],
@@ -272,7 +286,6 @@ app.get('/api/export/session/:id', (req, res) => {
         const sessionData = orchestrator.exportSession(id);
         
         if (sessionData) {
-            // Set headers for JSON download
             res.setHeader('Content-Type', 'application/json');
             res.setHeader('Content-Disposition', `attachment; filename="session_${id}.json"`);
             
@@ -295,7 +308,7 @@ app.get('/api/export/session/:id', (req, res) => {
     }
 });
 
-// PDF Export Endpoint (serves HTML that can be converted to PDF)
+// PDF Export Endpoint
 app.get('/api/export/pdf/:taskId', async (req, res) => {
     try {
         const { taskId } = req.params;
@@ -308,7 +321,6 @@ app.get('/api/export/pdf/:taskId', async (req, res) => {
             });
         }
 
-        // Generate HTML for PDF
         const html = `
         <!DOCTYPE html>
         <html>
@@ -387,7 +399,6 @@ app.get('/api/export/pdf/:taskId', async (req, res) => {
         </html>
         `;
 
-        // Send HTML (frontend will convert to PDF)
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
         
@@ -400,42 +411,9 @@ app.get('/api/export/pdf/:taskId', async (req, res) => {
     }
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-    const apiStatus = checkAPIStatus();
-    res.json({ 
-        status: 'OK',
-        timestamp: new Date(),
-        sessions: orchestrator.getSessions().length,
-        groq: {
-            status: apiStatus.apiKey === 'Set' ? 'Connected' : 'Not Connected',
-            model: apiStatus.model
-        }
-    });
-});
-
-// Serve frontend
-app.get('/', (req, res) => {
+// Serve frontend for all other routes
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Handle 404
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Endpoint not found',
-        availableEndpoints: [
-            'GET  /api/debug',
-            'GET  /api/sessions',
-            'POST /api/sessions',
-            'GET  /api/sessions/:id/tasks',
-            'POST /api/task',
-            'GET  /api/task/:id',
-            'GET  /api/export/session/:id',
-            'GET  /api/export/pdf/:taskId',
-            'GET  /api/health'
-        ]
-    });
 });
 
 // Error handling middleware
@@ -448,10 +426,15 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(port, () => {
-    console.log(`\n🚀 NuVora AI Multi-Agent Server`);
-    console.log(`📍 Running on port ${port}`);
-    console.log(`📊 Dashboard: http://localhost:${port}`);
-    console.log(`\n📁 Session Management Enabled`);
-    console.log(`🤖 PDF Export Ready`);
-});
+// Start server or export for Vercel
+if (require.main === module) {
+    // Local development
+    app.listen(PORT, () => {
+        console.log(`\n🚀 NuVora AI Multi-Agent Server`);
+        console.log(`📍 Running on port ${PORT}`);
+        console.log(`📊 Dashboard: http://localhost:${PORT}`);
+    });
+} else {
+    // Export for Vercel
+    module.exports = app;
+}
