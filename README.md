@@ -236,27 +236,27 @@ User Input → Task Classifier → Planner → Researcher → Writer → Output
 
 ### **Installation Steps**
 ```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/nuvora-ai.git
+1. Clone the repository
+git clone https://github.com/bhishant/Nuvora-AI-Multi-Agent.git
 cd nuvora-ai
 
-# 2. Install dependencies
+2. Install dependencies
 npm install
 
-# 3. Configure environment
+3. Configure environment
 cp .env.example .env
-# Edit .env with your Groq API key
+Edit .env with your Groq API key
 
-# 4. Start the server
+4. Start the server
 npm start
 
-# 5. Access the application
-# Open browser to: http://localhost:3333
+5. Access the application
+Open browser to: http://localhost:3333
 ```
 
 ### **Environment Configuration**
 ```env
-# .env file
+.env file
 PORT=3333
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=llama-3.1-8b-instant
@@ -298,22 +298,22 @@ sequenceDiagram
 
 ### **Example Queries**
 ```
-# 🎯 Comparison Tasks
+🎯 Comparison Tasks
 • "Compare Merge Sort vs Quick Sort algorithms"
 • "Python vs JavaScript for web development"
 • "React vs Vue vs Angular frameworks"
 
-# 📚 Explanation Tasks  
+📚 Explanation Tasks  
 • "Explain blockchain technology in simple terms"
 • "What is machine learning and how does it work?"
 • "Describe the concept of quantum entanglement"
 
-# 🔍 Analysis Tasks
+🔍 Analysis Tasks
 • "Analyze the impact of AI on job markets"
 • "Study the pros and cons of microservices"
 • "Evaluate different database systems"
 
-# 🎓 Tutorial Tasks
+🎓 Tutorial Tasks
 • "How to build a REST API with Node.js"
 • "Step-by-step guide to neural networks"
 • "Tutorial on using Docker containers"
@@ -338,18 +338,18 @@ const session = {
 
 ### **REST API Endpoints**
 ```
-# Task Management
+Task Management
 POST   /api/task           # Submit new task
 GET    /api/task/:id       # Get task details
 GET    /api/tasks          # List all tasks
 
-# Session Management
+Session Management
 GET    /api/sessions       # List sessions
 POST   /api/sessions       # Create session
 PUT    /api/sessions/:id   # Update session
 DELETE /api/sessions/:id   # Delete session
 
-# Export Operations
+Export Operations
 GET    /api/export/pdf/:taskId     # Export as PDF
 GET    /api/export/session/:id     # Export session data
 GET    /api/export/html/:taskId    # Get HTML output
@@ -467,19 +467,19 @@ nuvora-ai/
 
 ### **Built-in Testing Tools**
 ```bash
-# Test Groq API connection
+Test Groq API connection
 npm run test-api
 
-# Debug LLM responses
+Debug LLM responses
 npm run debug-llm
 
-# Check environment setup
+Check environment setup
 npm run check-env
 
-# Development mode with hot reload
+Development mode with hot reload
 npm run dev
 
-# Check for mock responses
+Check for mock responses
 node check-mock-files.js
 ```
 
@@ -493,21 +493,21 @@ GET /api/stats          # Usage statistics
 
 ### **Common Issues & Solutions**
 ```
-## ❌ API Connection Issues
+❌ API Connection Issues
 Problem: "Failed to initialize Groq client"
 Solution:
 1. Verify API key in .env file
 2. Check internet connectivity
 3. Test with: `node test-groq.js`
 
-## ❌ Empty Responses
+❌ Empty Responses
 Problem: AI returns empty content
 Solution:
 1. Check model availability
 2. Reduce prompt complexity
 3. Verify API rate limits
 
-## ❌ Session Errors
+❌ Session Errors
 Problem: Cannot create/load sessions
 Solution:
 1. Check file permissions
@@ -528,7 +528,7 @@ Solution:
 
 ### **Scaling Considerations**
 ```yaml
-# Horizontal Scaling Configuration
+Horizontal Scaling Configuration
 replicas: 3
 resources:
   requests:
@@ -538,13 +538,13 @@ resources:
     memory: "1Gi"
     cpu: "1000m"
 
-# Load Balancing Strategy
+Load Balancing Strategy
 loadBalancer:
   algorithm: round_robin
   healthCheck: /api/health
   sessionAffinity: true
 
-# Database Options
+Database Options
 database:
   primary: "session_data"
   cache: "redis://cache:6379"
@@ -628,22 +628,22 @@ graph LR
 
 ### **Branch Naming Convention**
 ```bash
-# Feature branches
+Feature branches
 git checkout -b feature/add-pdf-export
 
-# Bug fix branches  
+Bug fix branches  
 git checkout -b fix/api-timeout-issue
 
-# Documentation branches
+Documentation branches
 git checkout -b docs/update-readme
 
-# Release branches
+Release branches
 git checkout -b release/v2.1.0
 ```
 
 ### **Commit Message Format**
 ```bash
-# Format: type(scope): description
+Format: type(scope): description
 
 ✨ feat(api): add new export endpoints
 🐛 fix(ui): resolve session switching bug
@@ -655,21 +655,21 @@ git checkout -b release/v2.1.0
 
 ### **Development Setup**
 ```bash
-# 1. Set up development environment
+1. Set up development environment
 git clone https://github.com/yourusername/nuvora-ai.git
 cd nuvora-ai
 npm install
 
-# 2. Create development configuration
+2. Create development configuration
 cp .env.example .env.development
 
-# 3. Install development tools
+3. Install development tools
 npm install -D jest supertest eslint prettier
 
-# 4. Run development server
+4. Run development server
 npm run dev
 
-# 5. Run tests
+5. Run tests
 npm test
 ```
 
@@ -717,7 +717,7 @@ SOFTWARE.
 
 ```
 
-## 🤝 Contribution Areas
+🤝 Contribution Areas
 • 🧪 Testing & Quality Assurance
 • 📚 Documentation & Tutorials
 • 🔧 Code Improvements & Bug Fixes
@@ -727,4 +727,4 @@ SOFTWARE.
 
 ---
 
-**Made with ❤️ by the Bhishant*
+**Made with ❤️ by Bhishant*
