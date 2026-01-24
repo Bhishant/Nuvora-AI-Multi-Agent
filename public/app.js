@@ -1,29 +1,92 @@
 class NuVoraClient {
     constructor() {
-        // Use relative paths for Vercel
         this.baseURL = window.location.origin;
         this.currentSession = null;
         this.sessions = [];
         this.currentTasks = [];
+        this.initialized = false;
     }
 
     async initialize() {
-        await this.loadSessions();
-        await this.loadCurrentSessionTasks();
+        console.log('🚀 Initializing NuVora Client...');
+        console.log('📡 Base URL:', this.baseURL);
+        
+        // First check if server is responding
+        const serverOk = await this.checkServerStatus();
+        
+        if (!serverOk) {
+            console.error('❌ Server is not responding');
+            this.showServerError();
+            return;
+        }
+        
+        try {
+            await this.loadSessions();
+            await this.loadCurrentSessionTasks();
+            this.initialized = true;
+            console.log('✅ Client initialized successfully');
+        } catch (error) {
+            console.error('❌ Initialization failed:', error);
+            this.showConnectionError(error);
+        }
+    }
+
+    async checkServerStatus() {
+        try {
+            console.log('🔄 Checking server status...');
+            const response = await fetch(`${this.baseURL}/api/health`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 5000
+            });
+            
+            if (!response.ok) {
+                console.error('❌ Server health check failed:', response.status);
+                return false;
+            }
+            
+            const data = await response.json();
+            console.log('✅ Server status:', data.status);
+            return data.status === 'OK';
+        } catch (error) {
+            console.error('❌ Cannot reach server:', error);
+            return false;
+        }
     }
 
     async loadSessions() {
         try {
+            console.log('🔄 Loading sessions...');
             const response = await fetch(`${this.baseURL}/api/sessions`);
+            
+            // Check content type
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('❌ Received non-JSON response:', text.substring(0, 200));
+                throw new Error('Server returned non-JSON response');
+            }
+            
             const data = await response.json();
+            
+            if (!response.ok) {
+                console.error('❌ API error:', data.error || response.status);
+                throw new Error(data.error || 'Failed to load sessions');
+            }
             
             if (data.success) {
                 this.sessions = data.sessions;
+                console.log(`✅ Loaded ${this.sessions.length} sessions`);
                 this.renderSessions();
                 this.updateSessionUI();
+                return true;
+            } else {
+                throw new Error(data.error || 'Failed to load sessions');
             }
         } catch (error) {
-            console.error('Failed to load sessions:', error);
+            console.error('❌ Failed to load sessions:', error);
+            this.showNotification('Failed to load sessions. Please refresh the page.', 'error');
+            throw error;
         }
     }
 
@@ -45,11 +108,16 @@ class NuVoraClient {
     }
 
     async createSession(name) {
+        if (!name || name.trim() === '') {
+            showNotification('Please enter a session name', 'error');
+            return false;
+        }
+        
         try {
             const response = await fetch(`${this.baseURL}/api/sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({ name: name.trim() })
             });
             
             const data = await response.json();
@@ -59,12 +127,14 @@ class NuVoraClient {
                 await this.switchSession(data.sessionId);
                 showNotification('Session created successfully!', 'success');
                 return true;
+            } else {
+                throw new Error(data.error || 'Failed to create session');
             }
         } catch (error) {
             console.error('Failed to create session:', error);
             showNotification('Failed to create session: ' + error.message, 'error');
+            return false;
         }
-        return false;
     }
 
     async switchSession(sessionId) {
@@ -138,6 +208,7 @@ class NuVoraClient {
     async executeTask(task, taskType = '') {
         if (!this.currentSession) {
             showNotification('Please select a session first', 'error');
+            openSessionModal();
             return null;
         }
 
@@ -172,10 +243,17 @@ class NuVoraClient {
                 })
             });
 
+            // Check response type
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+            }
+
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.error || 'Server error');
+                throw new Error(data.error || `Server error: ${response.status}`);
             }
 
             if (data.success) {
@@ -227,30 +305,32 @@ class NuVoraClient {
         `).join('');
 
         // Render modal sessions
-        allSessionsList.innerHTML = this.sessions.map(session => `
-            <div class="session-modal-item">
-                <div class="session-modal-info">
-                    <div class="session-modal-name">
-                        ${session.name} ${session.active ? '(Active)' : ''}
+        if (allSessionsList) {
+            allSessionsList.innerHTML = this.sessions.map(session => `
+                <div class="session-modal-item">
+                    <div class="session-modal-info">
+                        <div class="session-modal-name">
+                            ${session.name} ${session.active ? '(Active)' : ''}
+                        </div>
+                        <div class="session-modal-meta">
+                            Created: ${new Date(session.created).toLocaleDateString()} • 
+                            Tasks: ${session.taskCount} • 
+                            Last: ${new Date(session.lastActivity).toLocaleDateString()}
+                        </div>
                     </div>
-                    <div class="session-modal-meta">
-                        Created: ${new Date(session.created).toLocaleDateString()} • 
-                        Tasks: ${session.taskCount} • 
-                        Last: ${new Date(session.lastActivity).toLocaleDateString()}
-                    </div>
-                </div>
-                <div class="session-modal-actions">
-                    <button class="session-action-btn" onclick="client.switchSession('${session.id}')">
-                        Switch
-                    </button>
-                    ${session.id !== this.currentSession?.id ? `
-                        <button class="session-action-btn delete" onclick="client.deleteSession('${session.id}')">
-                            Delete
+                    <div class="session-modal-actions">
+                        <button class="session-action-btn" onclick="client.switchSession('${session.id}')">
+                            Switch
                         </button>
-                    ` : ''}
+                        ${!session.active ? `
+                            <button class="session-action-btn delete" onclick="client.deleteSession('${session.id}')">
+                                Delete
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
     }
 
     renderTaskHistory() {
@@ -282,14 +362,24 @@ class NuVoraClient {
         
         if (activeSession) {
             this.currentSession = activeSession;
-            document.getElementById('activeSessionIndicator').textContent = activeSession.name;
-            document.getElementById('currentSessionName').textContent = activeSession.name;
+            const activeSessionIndicator = document.getElementById('activeSessionIndicator');
+            const currentSessionName = document.getElementById('currentSessionName');
+            
+            if (activeSessionIndicator) {
+                activeSessionIndicator.textContent = activeSession.name;
+            }
+            if (currentSessionName) {
+                currentSessionName.textContent = activeSession.name;
+            }
         }
     }
 
     updateTaskCount() {
         const count = this.currentTasks.length;
-        document.getElementById('sessionTaskCount').textContent = `${count} task${count !== 1 ? 's' : ''}`;
+        const sessionTaskCount = document.getElementById('sessionTaskCount');
+        if (sessionTaskCount) {
+            sessionTaskCount.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+        }
     }
 
     updateStatus(agent, status) {
@@ -314,18 +404,8 @@ class NuVoraClient {
         return new Promise(resolve => setTimeout(resolve, duration));
     }
 
-    async checkServerStatus() {
-        try {
-            const response = await fetch(`${this.baseURL}/api/debug`);
-            const data = await response.json();
-            return data.status === 'Server is running';
-        } catch (error) {
-            console.error('Server status check failed:', error);
-            return false;
-        }
-    }
-
     truncateText(text, maxLength) {
+        if (!text) return '';
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
     }
@@ -362,6 +442,59 @@ class NuVoraClient {
             .replace(/\n/g, '<br>')
             .replace(/^- (.*)$/gm, '<li style="margin-bottom: 8px;">$1</li>')
             .replace(/(<li[\s\S]*?<\/li>)/g, '<ul style="padding-left: 20px; margin: 15px 0;">$1</ul>');
+    }
+
+    showServerError() {
+        const output = document.getElementById('output');
+        if (output) {
+            output.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #dc3545;">
+                    <h3>🚨 Server Connection Error</h3>
+                    <p>Unable to connect to the NuVora AI server.</p>
+                    <p><strong>Possible solutions:</strong></p>
+                    <ol style="text-align: left; max-width: 500px; margin: 20px auto;">
+                        <li>Refresh the page</li>
+                        <li>Check your internet connection</li>
+                        <li>Contact support if the issue persists</li>
+                    </ol>
+                    <button onclick="window.location.reload()" style="
+                        background: #667eea;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin-top: 20px;
+                    ">
+                        🔄 Refresh Page
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    showConnectionError(error) {
+        const output = document.getElementById('output');
+        if (output) {
+            output.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ff9800;">
+                    <h3>⚠️ Connection Issue</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Please check the browser console for details.</p>
+                    <button onclick="testConnection()" style="
+                        background: #ff9800;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        margin-top: 20px;
+                    ">
+                        🔍 Test Connection
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
@@ -429,6 +562,7 @@ async function executeTask() {
             <div style="color: #dc3545; padding: 30px; text-align: center;">
                 <h3 style="margin-bottom: 15px;">❌ Task Failed</h3>
                 <p><strong>${error.message}</strong></p>
+                <p>Please check your connection and try again.</p>
             </div>
         `;
         showNotification('Task failed: ' + error.message, 'error');
@@ -491,7 +625,6 @@ async function exportCurrentSession() {
 
 async function exportToPDF(taskId = null) {
     if (!taskId) {
-        // Get the latest task from current session
         if (!client.currentTasks.length) {
             showNotification('No tasks to export', 'error');
             return;
@@ -500,26 +633,22 @@ async function exportToPDF(taskId = null) {
     }
     
     try {
-        // Get the HTML for PDF
         const response = await fetch(`${client.baseURL}/api/export/pdf/${taskId}`);
         const html = await response.text();
         
-        // Create a hidden iframe to render HTML
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
         iframe.style.top = '-9999px';
         iframe.style.left = '-9999px';
-        iframe.style.width = '210mm'; // A4 width
-        iframe.style.height = '297mm'; // A4 height
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         document.body.appendChild(iframe);
         
         const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
         iframeDoc.write(html);
         iframeDoc.close();
         
-        // Wait for content to load
         setTimeout(() => {
-            // Use html2canvas to capture the iframe content
             html2canvas(iframeDoc.body, {
                 scale: 2,
                 useCORS: true,
@@ -538,7 +667,6 @@ async function exportToPDF(taskId = null) {
                 pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
                 pdf.save(`NuVora_Report_${new Date().toISOString().split('T')[0]}.pdf`);
                 
-                // Clean up
                 document.body.removeChild(iframe);
                 
                 showNotification('PDF exported successfully!', 'success');
@@ -653,6 +781,21 @@ function showNotification(message, type = 'info') {
     }, 4000);
 }
 
+async function testConnection() {
+    console.log('🔍 Testing connection...');
+    try {
+        const response = await fetch(`${client.baseURL}/api/test`);
+        const data = await response.json();
+        console.log('✅ Connection test:', data);
+        showNotification('Connection test successful!', 'success');
+        return true;
+    } catch (error) {
+        console.error('❌ Connection test failed:', error);
+        showNotification('Connection test failed: ' + error.message, 'error');
+        return false;
+    }
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('🚀 NuVora AI Client Initialized');
@@ -661,8 +804,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     await client.initialize();
     
     // Event listeners
-    document.getElementById('newSessionBtn').addEventListener('click', openSessionModal);
-    document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
+    const newSessionBtn = document.getElementById('newSessionBtn');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    
+    if (newSessionBtn) {
+        newSessionBtn.addEventListener('click', openSessionModal);
+    }
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', clearHistory);
+    }
     
     // Close modals when clicking X
     document.querySelectorAll('.close-modal').forEach(btn => {
@@ -690,5 +840,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     // Focus on task input
-    document.getElementById('taskInput').focus();
+    const taskInput = document.getElementById('taskInput');
+    if (taskInput) {
+        taskInput.focus();
+    }
+    
+    // Auto-test connection after 2 seconds
+    setTimeout(testConnection, 2000);
 });
