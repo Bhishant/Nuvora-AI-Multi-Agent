@@ -8,7 +8,7 @@
 
 **Intelligent Agent Collaboration for Advanced Research & Analysis**
 
-**🚀 Quick Start** • **🏗️ Architecture** • **📚 Documentation** • **[🎮 Live Working](#-https://nuvora-ai-multi-agent.vercel.app/)** • **🤝 Contributing**
+**🚀 Quick Start** • **🏗️ Architecture** • **📚 Documentation** • **[🎮 Live Working](https://nuvora-ai-multi-agent.vercel.app/)** • **🤝 Contributing**
 
 ## 📋 Table of Contents
 1. [✨ Overview](#-overview)
